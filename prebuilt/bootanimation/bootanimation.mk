@@ -1,5 +1,4 @@
-#
-# Copyright (C) 2018-2019 crDroid Android Project
+# Copyright (C) 2017 crDroid Android Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,56 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-ifeq ($(TARGET_SCREEN_WIDTH),)
-    $(warning TARGET_SCREEN_WIDTH is not set, using default value: 1080)
-    TARGET_SCREEN_WIDTH := 1080
+ifneq ($(TARGET_SCREEN_WIDTH) $(TARGET_SCREEN_HEIGHT),$(space))
+# determine the smaller dimension
+TARGET_BOOTANIMATION_SIZE := $(shell \
+  if [ "$(TARGET_SCREEN_WIDTH)" -lt "$(TARGET_SCREEN_HEIGHT)" ]; then \
+    echo $(TARGET_SCREEN_WIDTH); \
+  else \
+    echo $(TARGET_SCREEN_HEIGHT); \
+  fi )
+
+# determine the bigger dimension
+TARGET_BOOTANIMATION_SIZE_ALT := $(shell \
+  if [ "$(TARGET_SCREEN_WIDTH)" -gt "$(TARGET_SCREEN_HEIGHT)" ]; then \
+    echo $(TARGET_SCREEN_WIDTH); \
+  else \
+    echo $(TARGET_SCREEN_HEIGHT); \
+  fi )
+
+# first try matching and use smaller dimension bootanimation
+ifneq ($(filter 480 720 1080 1440,$(TARGET_BOOTANIMATION_SIZE)),)
+PRODUCT_BOOTANIMATION := vendor/addons/prebuilt/bootanimation/$(TARGET_BOOTANIMATION_SIZE).zip
+else
+# if not try matching and use bigger dimension bootanimation
+ifneq ($(filter 480 720 1080 1440,$(TARGET_BOOTANIMATION_SIZE_ALT)),)
+PRODUCT_BOOTANIMATION := vendor/addons/prebuilt/bootanimation/$(TARGET_BOOTANIMATION_SIZE_ALT).zip
+else
+# if not found use default bootanimation
+PRODUCT_BOOTANIMATION := vendor/addons/prebuilt/bootanimation/bootanimation.zip
 endif
-ifeq ($(TARGET_SCREEN_HEIGHT),)
-    $(warning TARGET_SCREEN_HEIGHT is not set, using default value: 1920)
-    TARGET_SCREEN_HEIGHT := 1920
-endif
-BOOTFPS := 25
-
-TARGET_GENERATED_BOOTANIMATION := $(TARGET_OUT_INTERMEDIATES)/BOOTANIMATION/bootanimation.zip
-$(TARGET_GENERATED_BOOTANIMATION): INTERMEDIATES := $(TARGET_OUT_INTERMEDIATES)/BOOTANIMATION/intermediates
-$(TARGET_GENERATED_BOOTANIMATION): $(SOONG_ZIP)
-	@echo "Building bootanimation.zip"
-	@rm -rf $(dir $@)
-	@mkdir -p $(dir $@)/intermediates
-	$(hide) if [ $(TARGET_SCREEN_HEIGHT) -lt $(TARGET_SCREEN_WIDTH) ]; then \
-	    IMAGEWIDTH=$(TARGET_SCREEN_HEIGHT); \
-	else \
-	    IMAGEWIDTH=$(TARGET_SCREEN_WIDTH); \
-	fi; \
-	IMAGESCALEWIDTH=$$IMAGEWIDTH; \
-	IMAGESCALEHEIGHT=$$(expr $$IMAGESCALEWIDTH \* 16 \/ 9); \
-	RESOLUTION="$$IMAGESCALEWIDTH"x"$$IMAGESCALEHEIGHT"; \
-	if [ "$$IMAGESCALEWIDTH" -eq 1440 ]; then \
-	    tar xfp vendor/addons/prebuilt/bootanimation/bootanimation_1440.tar -C $(INTERMEDIATES); \
-	elif [ "$$IMAGESCALEWIDTH" -eq 1080 ]; then \
-	    tar xfp vendor/addons/prebuilt/bootanimation/bootanimation_1080.tar -C $(INTERMEDIATES); \
-	elif [ "$$IMAGESCALEWIDTH" -eq 720 ]; then \
-	    tar xfp vendor/addons/prebuilt/bootanimation/bootanimation_720.tar -C $(INTERMEDIATES); \
-	else \
-	    tar xfp vendor/addons/prebuilt/bootanimation/bootanimation.tar -C $(INTERMEDIATES); \
-	    prebuilts/tools-lineage/${HOST_OS}-x86/bin/mogrify -resize $$RESOLUTION -colors 250 $(INTERMEDIATES)/*/*.png; \
-	fi; \
-	echo "$$IMAGESCALEWIDTH $$IMAGESCALEHEIGHT $(BOOTFPS)" > $(INTERMEDIATES)/desc.txt; \
-	cat vendor/addons/prebuilt/bootanimation/desc.txt >> $(INTERMEDIATES)/desc.txt;
-	$(hide) $(SOONG_ZIP) -L 0 -o $(TARGET_GENERATED_BOOTANIMATION) -C $(INTERMEDIATES) -D $(INTERMEDIATES)
-
-ifeq ($(TARGET_BOOTANIMATION),)
-    TARGET_BOOTANIMATION := $(TARGET_GENERATED_BOOTANIMATION)
 endif
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := bootanimation.zip
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT)/media
-
-include $(BUILD_SYSTEM)/base_rules.mk
-
-$(LOCAL_BUILT_MODULE): $(TARGET_BOOTANIMATION)
-	@cp $(TARGET_BOOTANIMATION) $@
+else
+PRODUCT_BOOTANIMATION := vendor/addons/prebuilt/bootanimation/bootanimation.zip
+endif
